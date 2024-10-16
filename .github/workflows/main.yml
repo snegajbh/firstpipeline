@@ -1,0 +1,34 @@
+# .gitlab-ci.yml
+
+# Use the official Playwright image with all required dependencies
+image: mcr.microsoft.com/playwright:focal
+
+# Define the pipeline stages
+stages:
+  - test
+
+# Cache node_modules to speed up subsequent pipeline runs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+
+# Before running the test, install the dependencies
+before_script:
+  - npm install  # Install npm dependencies
+
+# Job to run Playwright tests
+test:
+  stage: test
+  script:
+    # Install Playwright browsers with necessary dependencies
+    - npx playwright install --with-deps
+    # Run the Playwright test cases
+    - npx playwright test --reporter=dot
+  artifacts:
+    when: always  # Save artifacts even if the job fails
+    paths:
+      - test-results/  # Store test results for further investigation
+    expire_in: 1 week  # Keep the results for 1 week
+
+# Optional: You can customize the headless mode as needed
