@@ -26,45 +26,37 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Android SDK
+      - name: Install Android SDK (Fixed Extraction)
         run: |
-          # Create SDK directories
+          # Create SDK directory
           mkdir -p ~/android-sdk/cmdline-tools
           
           # Download command-line tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           
-          # Extract to correct location
-          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
-          rm cmdline-tools.zip
+          # Extract and fix directory structure
+          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools-tmp
+          mv ~/android-sdk/cmdline-tools-tmp/cmdline-tools ~/android-sdk/cmdline-tools/latest
+          rm -rf cmdline-tools.zip ~/android-sdk/cmdline-tools-tmp
           
           # Set environment variables
           echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
           echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
           
-          # Verify installation
-          ls -la ~/android-sdk/cmdline-tools/latest
-          
-          # Use full path for SDK commands
-          yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+          # Install required components
+          yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=~/android-sdk --licenses
+          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=~/android-sdk "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
 
-      - name: Verify Android Tools
+      - name: Verify SDK Installation
         run: |
-          # Add platform-tools to PATH
-          echo "PATH=$PATH:~/android-sdk/platform-tools" >> $GITHUB_ENV
-          
-          # Verify commands are accessible
-          which sdkmanager
-          which avdmanager
-          which emulator
-          which adb
-          sdkmanager --version
+          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=~/android-sdk --list
+          echo "Android tools installed at:"
+          ls -la ~/android-sdk
 
       - name: Launch Emulator
         run: |
           # Create AVD
-          ~/android-sdk/cmdline-tools/latest/bin/avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6 --force
+          ~/android-sdk/cmdline-tools/latest/bin/avdmanager --sdk_root=~/android-sdk create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6 --force
           
           # Start emulator
           ~/android-sdk/emulator/emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
