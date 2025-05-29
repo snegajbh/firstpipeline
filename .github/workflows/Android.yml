@@ -1,6 +1,10 @@
-name: WDIO Android Emulator Test
+name: Android Emulator Test
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
@@ -22,26 +26,36 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          licenses: |
-            android-sdk-license
-            android-sdk-preview-license
+      - name: Install Android SDK (Fixed Structure)
+        run: |
+          # Create proper SDK directory structure
+          mkdir -p ~/android-sdk/cmdline-tools/latest
+          
+          # Download and extract command-line tools to correct location
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
+          rm cmdline-tools.zip
+          
+          # Set environment variables
+          echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
+          echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
+          
+          # Accept licenses and install packages
+          yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
 
       - name: Launch Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 33
-          arch: x86_64
-          profile: Pixel 6
-          disable-animations: true
-          script: |
-            adb wait-for-device
-            adb shell settings put global window_animation_scale 0
-            sleep 20  # Wait for full boot
+        run: |
+          # Create AVD
+          echo "no" | ~/android-sdk/cmdline-tools/latest/bin/avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6
+          
+          # Start emulator
+          ~/android-sdk/emulator/emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
+          adb wait-for-device
+          adb shell settings put global window_animation_scale 0
+          sleep 30
 
-      - name: Run WDIO Tests
+      - name: Run Tests
         run: |
           npm install
           npx wdio run wdio.conf.js
