@@ -29,11 +29,6 @@ jobs:
             android-sdk-license
             android-sdk-preview-license
 
-      - name: Build APK (if needed)
-        run: |
-          ./gradlew assembleDebug
-          ls app/build/outputs/apk/debug/
-
       - name: Launch Emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
