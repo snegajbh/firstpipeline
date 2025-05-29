@@ -29,28 +29,31 @@ jobs:
       - name: Install Android SDK (Fixed Structure)
         run: |
           # Create proper SDK directory structure
-          mkdir -p ~/android-sdk/cmdline-tools/latest
+          mkdir -p ~/android-sdk/cmdline-tools
           
-          # Download and extract command-line tools to correct location
+          # Download command-line tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
-          rm cmdline-tools.zip
+          
+          # Extract to correct location (without extra directory layer)
+          unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/tmp
+          mv ~/android-sdk/cmdline-tools/tmp/cmdline-tools/* ~/android-sdk/cmdline-tools
+          rm -rf ~/android-sdk/cmdline-tools/tmp cmdline-tools.zip
           
           # Set environment variables
           echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
+          echo "PATH=$PATH:~/android-sdk/cmdline-tools/bin:~/android-sdk/platform-tools" >> $GITHUB_ENV
           
           # Accept licenses and install packages
-          yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
 
       - name: Launch Emulator
         run: |
           # Create AVD
-          echo "no" | ~/android-sdk/cmdline-tools/latest/bin/avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6
+          echo "no" | avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6
           
           # Start emulator
-          ~/android-sdk/emulator/emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
+          emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
           adb wait-for-device
           adb shell settings put global window_animation_scale 0
           sleep 30
