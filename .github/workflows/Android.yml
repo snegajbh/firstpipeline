@@ -26,42 +26,48 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Android SDK (Fixed)
+      - name: Install Android SDK
         run: |
-          # Create SDK directory
+          # Create SDK directories
           mkdir -p ~/android-sdk/cmdline-tools
           
           # Download command-line tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           
-          # Extract and fix directory structure
+          # Extract to correct location
           unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools-tmp
           mv ~/android-sdk/cmdline-tools-tmp/cmdline-tools ~/android-sdk/cmdline-tools/latest
           rm -rf cmdline-tools.zip ~/android-sdk/cmdline-tools-tmp
           
-          # Set environment variables
-          echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=~/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:~/android-sdk/emulator" >> $GITHUB_ENV
+          # Set environment variables for CURRENT STEP
+          export ANDROID_HOME=~/android-sdk
+          export ANDROID_SDK_ROOT=~/android-sdk
+          export PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:~/android-sdk/emulator
           
-          # Install required components
+          # Make commands executable
+          chmod +x ~/android-sdk/cmdline-tools/latest/bin/*
+          
+          # Accept licenses and install packages
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+          
+          # Also set for future steps
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
 
       - name: Verify SDK Installation
         run: |
-          echo "PATH: $PATH"
-          sdkmanager --list
+          # Check installation
+          sdkmanager --list | head -n 20
           which avdmanager
           which emulator
           which adb
+          avdmanager list avd
 
       - name: Create Android Virtual Device
         run: |
-          # Create AVD without --sdk_root flag
           avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6 --force
-          
-          # Verify AVD creation
           avdmanager list avd
 
       - name: Launch Emulator
