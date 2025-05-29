@@ -1,0 +1,91 @@
+name: Android Emulator Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpulse0 libgl1-mesa-glx pulseaudio
+          # Set virtual display for headless environment
+          sudo apt-get install -y xvfb
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Android SDK
+        run: |
+          # Create SDK directories
+          mkdir -p ~/android-sdk/cmdline-tools
+          
+          # Download command-line tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          
+          # Extract to correct location
+          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools-tmp
+          mv ~/android-sdk/cmdline-tools-tmp/cmdline-tools ~/android-sdk/cmdline-tools/latest
+          rm -rf cmdline-tools.zip ~/android-sdk/cmdline-tools-tmp
+          
+          # Set environment variables
+          export ANDROID_HOME=~/android-sdk
+          export ANDROID_SDK_ROOT=~/android-sdk
+          export PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:~/android-sdk/emulator
+          
+          # Make commands executable
+          chmod +x ~/android-sdk/cmdline-tools/latest/bin/*
+          
+          # Accept licenses and install packages
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+          
+          # Also set for future steps
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$PATH" >> $GITHUB_ENV
+
+      - name: Create Android Virtual Device
+        run: |
+          avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6 --force
+          avdmanager list avd
+
+      - name: Launch Emulator with Xvfb
+        run: |
+          # Start virtual display
+          Xvfb :99 -screen 0 1280x1024x24 &
+          export DISPLAY=:99
+          
+          # Start emulator with no-window option
+          emulator -avd Pixel_6_API_33 -no-window -no-audio -no-boot-anim -no-snapshot -accel on &
+          
+          # Wait for device
+          adb wait-for-device
+          adb shell settings put global window_animation_scale 0
+          sleep 30
+
+      - name: Run Tests
+        run: |
+          npm install
+          npx wdio run wdio.conf.js
+        env:
+          APPIUM_HOST: localhost
+          APPIUM_PORT: 4723
