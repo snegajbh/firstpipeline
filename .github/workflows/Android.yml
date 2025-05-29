@@ -30,12 +30,7 @@ jobs:
           openssl genrsa -out ~/.android/adbkey 2048
           openssl rsa -in ~/.android/adbkey -pubout -out ~/.android/adbkey.pub
 
-      - name: Build APK (if needed)
-        run: |
-          # Only if you need to build your APK
-          # ./gradlew assembleDebug
-          ls app/build/outputs/apk/debug/
-
+    
       - name: Start Android Emulator in Docker
         run: |
           # Use a known working image tag
