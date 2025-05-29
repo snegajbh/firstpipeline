@@ -20,9 +20,25 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install ADB and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y adb libpulse0 libgl1-mesa-glx
+          adb start-server
+          mkdir -p ~/.android
+          echo "Generating temporary ADB key"
+          openssl genrsa -out ~/.android/adbkey 2048
+          openssl rsa -in ~/.android/adbkey -pubout -out ~/.android/adbkey.pub
+
+      - name: Build APK (if needed)
+        run: |
+          # Only if you need to build your APK
+          # ./gradlew assembleDebug
+          ls app/build/outputs/apk/debug/
+
       - name: Start Android Emulator in Docker
         run: |
-          # Start emulator in Docker with ADB port exposed
+          # Use a known working image tag
           docker run -d \
             --name android-emulator \
             -p 5554:5554 \
@@ -30,14 +46,21 @@ jobs:
             -e ADBKEY="$(cat ~/.android/adbkey)" \
             -e EMULATOR_ARGS="-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim" \
             -v $PWD:/app \
-            us-docker.pkg.dev/android-emulator-268719/images/33-google-apis-x86_64:33.1.2
-          
+            us-docker.pkg.dev/android-emulator-268719/images/33-google-apis-x86_64:33.0.3
+
           # Wait for emulator to start
-          sleep 60
+          sleep 30
+          
+          # Connect to emulator
           adb connect localhost:5554
           adb devices
+          
+          # Wait for device to be ready
           adb wait-for-device
           adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          sleep 10
 
       - name: Run Tests
         run: |
