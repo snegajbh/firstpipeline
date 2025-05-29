@@ -1,0 +1,67 @@
+name: Android Emulator Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Extended timeout for emulator boot
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Java (JDK 17)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. Set up Node.js (for WDIO)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 4. Install Android SDK (manual approach to avoid warnings)
+      - name: Install Android SDK
+        run: |
+          # Download command-line tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d ~/android-sdk
+          echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
+          echo "PATH=$PATH:~/android-sdk/cmdline-tools/bin" >> $GITHUB_ENV
+
+          # Accept licenses (non-interactive)
+          yes | ~/android-sdk/cmdline-tools/bin/sdkmanager --licenses
+
+          # Install required packages (emulator, platform-tools)
+          ~/android-sdk/cmdline-tools/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+
+      # 5. Launch Emulator (with fixes for common issues)
+      - name: Launch Emulator
+        run: |
+          # Create AVD (Pixel 6, API 33)
+          echo "no" | ~/android-sdk/cmdline-tools/bin/avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6
+
+          # Start emulator with hardware acceleration (critical for CI)
+          ~/android-sdk/emulator/emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
+          adb wait-for-device
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          sleep 30  # Wait for full boot
+
+      # 6. Run WDIO Tests
+      - name: Run Tests
+        run: |
+          npm install
+          npx wdio run wdio.conf.js
+        env:
+          APPIUM_HOST: localhost
+          APPIUM_PORT: 4723
