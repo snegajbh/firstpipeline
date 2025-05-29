@@ -26,36 +26,52 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Android SDK (Fixed Structure)
+      - name: Install Android SDK
         run: |
-          # Create proper SDK directory structure
+          # Create SDK directories
           mkdir -p ~/android-sdk/cmdline-tools
           
           # Download command-line tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
           
-          # Extract to correct location (without extra directory layer)
-          unzip -q cmdline-tools.zip -d ~/android-sdk/cmdline-tools/tmp
-          mv ~/android-sdk/cmdline-tools/tmp/cmdline-tools/* ~/android-sdk/cmdline-tools
-          rm -rf ~/android-sdk/cmdline-tools/tmp cmdline-tools.zip
+          # Extract to correct location
+          unzip cmdline-tools.zip -d ~/android-sdk/cmdline-tools/latest
+          rm cmdline-tools.zip
           
           # Set environment variables
           echo "ANDROID_HOME=~/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$PATH:~/android-sdk/cmdline-tools/bin:~/android-sdk/platform-tools" >> $GITHUB_ENV
+          echo "PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_ENV
           
-          # Accept licenses and install packages
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+          # Verify installation
+          ls -la ~/android-sdk/cmdline-tools/latest
+          
+          # Use full path for SDK commands
+          yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+          ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" "platforms;android-33" "system-images;android-33;google_apis;x86_64"
+
+      - name: Verify Android Tools
+        run: |
+          # Add platform-tools to PATH
+          echo "PATH=$PATH:~/android-sdk/platform-tools" >> $GITHUB_ENV
+          
+          # Verify commands are accessible
+          which sdkmanager
+          which avdmanager
+          which emulator
+          which adb
+          sdkmanager --version
 
       - name: Launch Emulator
         run: |
           # Create AVD
-          echo "no" | avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6
+          ~/android-sdk/cmdline-tools/latest/bin/avdmanager create avd -n Pixel_6_API_33 -k "system-images;android-33;google_apis;x86_64" -d pixel_6 --force
           
           # Start emulator
-          emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
-          adb wait-for-device
-          adb shell settings put global window_animation_scale 0
+          ~/android-sdk/emulator/emulator -avd Pixel_6_API_33 -no-audio -no-boot-anim -no-snapshot -accel on &
+          
+          # Wait for device
+          ~/android-sdk/platform-tools/adb wait-for-device
+          ~/android-sdk/platform-tools/adb shell settings put global window_animation_scale 0
           sleep 30
 
       - name: Run Tests
